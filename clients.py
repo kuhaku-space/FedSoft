@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn.utils import parameters_to_vector
 from torch.utils.data import DataLoader
 import copy
 
@@ -90,13 +91,10 @@ class Client:
                     out = out.view(-1, self.solver.num_classes)
                 loss = self.solver.criterion(out, y)
 
+                local_vec = parameters_to_vector(self.model.parameters())
                 for i, cluster in enumerate(self.server.cluster_vec):
-                    l2 = None
-                    for (param_local, param_cluster) in zip(self.model.parameters(), cluster.parameters()):
-                        if l2 is None:
-                            l2 = mse_loss(param_local, param_cluster)
-                        else:
-                            l2 += mse_loss(param_local, param_cluster)
+                    cluster_vec = parameters_to_vector(cluster.parameters())
+                    l2 = mse_loss(local_vec, cluster_vec)
                     loss += self.solver.reg_weight / 2 * self.importance_estimated[i] * l2
 
                 self.optimizer.zero_grad()
