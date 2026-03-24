@@ -2,6 +2,7 @@ import copy
 
 import torch
 import numpy as np
+from tqdm import tqdm
 
 from FLAG import device, validation_data_flush_interval
 from utils import logger
@@ -49,12 +50,13 @@ class Server:
 
     def _run_fedsoft(self, num_global_epochs):
         validation_dict = {}
-        for t in range(num_global_epochs):
+        pbar = tqdm(range(num_global_epochs), desc=f'[{self.exp_id}]', unit='epoch')
+        for t in pbar:
             # Importance estimation
             if t % self.server_solver.estimation_interval == 0:
                 self.importance_weights_matrix = []  # dim = (num_clients, num_clusters)
                 for client in self.client_vec:
-                    client.estimate_importance_weights('fedsoft')
+                    client.estimate_importance_weights()
                     self.importance_weights_matrix.append(client.get_importance())
                 self.importance_weights_matrix = np.array(self.importance_weights_matrix)
                 self.importance_weights_matrix /= np.sum(self.importance_weights_matrix, axis=0)
