@@ -15,7 +15,7 @@ class Client:
         self.ds = ds
         self.num_samples = len(ds)
         self.solver = solver
-        self.loader = DataLoader(self.ds, batch_size=self.solver.batch_size)
+        self.loader = DataLoader(self.ds, batch_size=self.solver.batch_size, pin_memory=FLAG.device.type == 'cuda')
 
         self.random = np.random.RandomState(seed=ID)
         self.server = None
@@ -39,12 +39,13 @@ class Client:
             table = np.zeros((self.server.num_clusters, self.num_samples))
             start_idx = 0
             nst_cluster_sample_count = [0] * self.server.num_clusters
-            sample_loader = DataLoader(self.ds, batch_size=256)
+            sample_loader = DataLoader(self.ds, batch_size=256, pin_memory=FLAG.device.type == 'cuda')
+            for s, cluster in enumerate(self.server.cluster_vec):
+                cluster.eval()
             for x, y in sample_loader:
                 x = x.to(FLAG.device)
                 y = y.to(FLAG.device)
                 for s, cluster in enumerate(self.server.cluster_vec):
-                    cluster.eval()
                     out = cluster(x)
                     if self.solver.classification:
                         out = out.view(-1, self.solver.num_classes)
@@ -79,6 +80,7 @@ class Client:
         self.model.eval()
 
     def _local_train(self):
+        mse_loss = nn.MSELoss(reduction='sum')
         for _ in range(self.solver.local_epoch):
             for x, y in self.loader:
                 x = x.to(FLAG.device)
@@ -88,7 +90,6 @@ class Client:
                     out = out.view(-1, self.solver.num_classes)
                 loss = self.solver.criterion(out, y)
 
-                mse_loss = nn.MSELoss(reduction='sum')
                 for i, cluster in enumerate(self.server.cluster_vec):
                     l2 = None
                     for (param_local, param_cluster) in zip(self.model.parameters(), cluster.parameters()):
