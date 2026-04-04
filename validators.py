@@ -30,7 +30,8 @@ class ValidatorClassification:
         self.num_class = config.num_class
         self.test_loader_vec = []
         for ds in test_ds_vec:
-            self.test_loader_vec.append(DataLoader(ds, batch_size=config.test_ds_batch_size))
+            self.test_loader_vec.append(DataLoader(ds, batch_size=config.test_ds_batch_size,
+                                                   pin_memory=True, num_workers=4))
 
         # populate class_total_vec
         self.class_total_vec = []
@@ -149,7 +150,8 @@ class ValidatorRegression:
         self.verbose = config.verbose
         self.test_loader_vec = []
         for ds in test_ds_vec:
-            self.test_loader_vec.append(DataLoader(ds, batch_size=config.test_ds_batch_size))
+            self.test_loader_vec.append(DataLoader(ds, batch_size=config.test_ds_batch_size,
+                                                   pin_memory=True, num_workers=4))
 
     def validate(self, client_vec, cluster_vec, t):
         with torch.no_grad():

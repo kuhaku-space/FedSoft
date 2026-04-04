@@ -16,7 +16,7 @@ class Client:
         self.ds = ds
         self.num_samples = len(ds)
         self.solver = solver
-        self.loader = DataLoader(self.ds, batch_size=self.solver.batch_size, pin_memory=FLAG.device.type == 'cuda')
+        self.loader = DataLoader(self.ds, batch_size=self.solver.batch_size, pin_memory=FLAG.device.type == 'cuda', num_workers=4, persistent_workers=True)
 
         self.random = np.random.RandomState(seed=ID)
         self.server = None
@@ -40,7 +40,7 @@ class Client:
             table = np.zeros((self.server.num_clusters, self.num_samples))
             start_idx = 0
             nst_cluster_sample_count = [0] * self.server.num_clusters
-            sample_loader = DataLoader(self.ds, batch_size=256, pin_memory=FLAG.device.type == 'cuda')
+            sample_loader = DataLoader(self.ds, batch_size=256, pin_memory=FLAG.device.type == 'cuda', num_workers=4)
             for s, cluster in enumerate(self.server.cluster_vec):
                 cluster.eval()
             for x, y in sample_loader:
@@ -82,6 +82,8 @@ class Client:
 
     def _local_train(self):
         mse_loss = nn.MSELoss(reduction='sum')
+        cluster_vecs = [parameters_to_vector(cluster.parameters()).detach()
+                        for cluster in self.server.cluster_vec]
         for _ in range(self.solver.local_epoch):
             for x, y in self.loader:
                 x = x.to(FLAG.device)
@@ -92,8 +94,7 @@ class Client:
                 loss = self.solver.criterion(out, y)
 
                 local_vec = parameters_to_vector(self.model.parameters())
-                for i, cluster in enumerate(self.server.cluster_vec):
-                    cluster_vec = parameters_to_vector(cluster.parameters())
+                for i, cluster_vec in enumerate(cluster_vecs):
                     l2 = mse_loss(local_vec, cluster_vec)
                     loss += self.solver.reg_weight / 2 * self.importance_estimated[i] * l2
 
